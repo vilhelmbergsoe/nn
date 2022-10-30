@@ -104,31 +104,22 @@ fn fitness(nn: &NeuralNetwork, inputs: &[Array1<f32>], outputs: &[f32]) -> f32 {
     sum / diffs.len() as f32
 }
 
-fn get_best(pool: Vec<NeuralNetwork>, inputs: &[Array1<f32>], outputs: &[f32]) -> NeuralNetwork {
-    let mut curr_best: NeuralNetwork = pool[0].clone();
-    let mut curr_val: f32 = 100.0;
-
-    for nn in pool {
-        if fitness(&nn, inputs, outputs) < curr_val {
-            curr_best = nn;
-            curr_val = fitness(&curr_best, inputs, outputs);
-        }
-    }
-
-    curr_best
+fn get_best(pool: &mut Vec<NeuralNetwork>, inputs: &[Array1<f32>], outputs: &[f32]) {
+    pool.sort_by(|a, b| fitness(a, inputs, outputs).partial_cmp(&fitness(b, inputs, outputs)).unwrap());
 }
 
 fn test_fn(x: f32) -> f32 {
     x.sin() / 2.0
+    // x / 20.0
 }
 
 fn main() {
-    let pool_size: usize = 500;
+    let pool_size: usize = 100;
 
     let mut pool: Vec<NeuralNetwork> = Vec::new();
 
     for _ in 0..pool_size {
-        pool.push(NeuralNetwork::new(&[1, 5, 3, 1]))
+        pool.push(NeuralNetwork::new(&[1, 3, 2, 1]))
     }
 
     let num_gens = 10000;
@@ -136,35 +127,42 @@ fn main() {
     for gen in 0..num_gens {
         let mut inputs: Vec<Array1<f32>> = Vec::with_capacity(20);
         let mut outputs: Vec<f32> = Vec::with_capacity(20);
-        for _ in 0..20 {
+        for i in 0..20 {
             let mut rng = rand::thread_rng();
             let r = Uniform::from(-10.0..=10.0);
             let num = r.sample(&mut rng);
+            // let num = i as f32;
 
             inputs.push(arr1(&[num]));
             outputs.push(test_fn(num));
         }
 
-        let best = get_best(pool.clone(), &inputs, &outputs);
+        get_best(&mut pool, &inputs, &outputs);
 
-        pool[0] = best.clone();
-        for i in 1..pool_size {
-            pool[i] = best.clone();
-            pool[i].mutate(0.1, 0.1);
+        let top = 10;
+        let len = pool.len()/top;
+        for i in 0..len {
+            for j in 0..top-1 {
+                pool[i*(top-1)+j+len] = pool[i].clone();
+            }
         }
 
-        println!("generation {}: {}", gen, fitness(&best, &inputs, &outputs));
+        for i in (pool.len() / 4)..pool.len() {
+            pool[i].mutate(0.005, 0.05);
+        }
+
+        println!("generation {}: {}", gen, fitness(&pool[0], &inputs, &outputs));
 
         if gen == num_gens-1 {
             println!("---");
 
-            best.print();
+            pool[0].print();
 
             for i in 0..inputs.len() {
                 println!(
-                    "{}: {} - {}",
+                    "{}: {} ({})",
                     inputs[i],
-                    best.predict(&inputs[i]),
+                    pool[0].predict(&inputs[i]),
                     outputs[i]
                 );
             }
