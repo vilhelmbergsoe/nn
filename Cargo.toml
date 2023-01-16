@@ -6,5 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+fastapprox = "0.3.0"
 ndarray = "0.15.6"
+radsort = "0.1.0"
 rand = "0.8.5"
