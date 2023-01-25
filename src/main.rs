@@ -23,7 +23,7 @@ impl NeuralLayer {
             b: Array1::from_shape_simple_fn(c, rand::random),
         }
     }
-    pub fn calc(&self, inputs: Array1<f32>) -> Array1<f32> {
+    pub fn calc(&self, inputs: &Array1<f32>) -> Array1<f32> {
         (inputs.dot(&self.w) + &self.b).map(|x| tanh(*x))
     }
 }
@@ -46,8 +46,8 @@ impl NeuralNetwork {
     pub fn predict(&self, inputs: &Array1<f32>) -> Array1<f32> {
         let mut curr: Array1<f32> = inputs.clone();
 
-        for layer in self.layers.iter() {
-            curr = layer.calc(curr);
+        for layer in &self.layers {
+            curr = layer.calc(&curr);
         }
 
         curr
@@ -76,17 +76,17 @@ impl NeuralNetwork {
         }
     }
     pub fn print(&self) {
-        for layer in self.layers.iter() {
+        for layer in &self.layers {
             print!("weights:\t");
             layer.w.for_each(|x| {
                 print!("{x}\t");
             });
-            println!("");
+            println!();
             print!("biases:\t");
             layer.b.for_each(|x| {
                 print!("{x}\t");
             });
-            println!("");
+            println!();
         }
     }
     pub fn fitness(&self, inputs: &[Array1<f32>], outputs: &[f32]) -> f32 {
@@ -104,22 +104,7 @@ impl NeuralNetwork {
     }
 }
 
-// fn fitness(nn: &NeuralNetwork, inputs: &[Array1<f32>], outputs: &[f32]) -> f32 {
-//     let mut diffs: Vec<f32> = Vec::with_capacity(inputs.len());
-
-//     for i in 0..inputs.len() {
-//         let diff = nn.predict(&inputs[i])[0] - outputs[i];
-
-//         diffs.push(diff * diff);
-//     }
-
-//     let sum = diffs.iter().sum::<f32>();
-
-//     sum / diffs.len() as f32
-// }
-
 fn get_best(pool: &mut [NeuralNetwork], inputs: &[Array1<f32>], outputs: &[f32]) {
-    // pool.sort_by(|a, b| a.fitness(inputs, outputs).partial_cmp(&b.fitness(inputs, outputs)).unwrap());
     radsort::sort_by_cached_key(pool, |nn| nn.fitness(inputs, outputs));
 }
 
@@ -130,24 +115,24 @@ fn test_fn(x: f32) -> f32 {
 }
 
 fn main() {
-    let pool_size: usize = 200;
+    let pool_size: usize = 500;
 
     let mut pool: Vec<NeuralNetwork> = Vec::new();
 
     for _ in 0..pool_size {
-        pool.push(NeuralNetwork::new(&[1, 3, 5, 3, 1]))
+        pool.push(NeuralNetwork::new(&[1, 2, 3, 5, 5, 5, 3, 2, 1]));
     }
 
-    let num_gens = 15000;
+    let num_gens = 20000;
 
     for gen in 0..num_gens {
         let mut inputs: Vec<Array1<f32>> = Vec::with_capacity(20);
         let mut outputs: Vec<f32> = Vec::with_capacity(20);
         for i in 0..20 {
-            let mut rng = rand::thread_rng();
-            let r = Uniform::from(-10.0..=10.0);
-            let num = r.sample(&mut rng);
-            // let num = i as f32;
+            // let mut rng = rand::thread_rng();
+            // let r = Uniform::from(-10.0..=10.0);
+            // let num = r.sample(&mut rng);
+            let num = i as f32;
 
             inputs.push(arr1(&[num]));
             outputs.push(test_fn(num));
@@ -155,7 +140,7 @@ fn main() {
 
         get_best(&mut pool, &inputs, &outputs);
 
-        let top = 8;
+        let top = 4;
         let len = pool.len()/top;
         for i in 0..len {
             for j in 0..top-1 {
@@ -164,10 +149,10 @@ fn main() {
         }
 
         for i in (pool.len() / top)..pool.len() {
-            pool[i].mutate(0.1, 0.05, 0.005);
+            pool[i].mutate(0.1, 0.5, 0.05);
         }
 
-        println!("generation {gen}: {}", (&pool[0]).fitness(&inputs, &outputs));
+        println!("generation {gen}: {}", &pool[0].fitness(&inputs, &outputs));
 
         if gen == num_gens-1 {
             println!("---");
