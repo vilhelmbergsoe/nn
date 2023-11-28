@@ -15,6 +15,10 @@ impl Tensor {
             requires_grad,
         }
     }
+
+    pub fn matmul(&self, other: &Self) -> Self {
+        Tensor::new(self.data.view().dot(&other.data.view()).into_dyn(), self.requires_grad || other.requires_grad)
+    }
 }
 
 impl fmt::Display for Tensor {
@@ -42,10 +46,14 @@ impl Linear {
         // assert_eq!(self.w.data.shape()[1], input.data.shape()[0]);
 
         let reshaped_input = input.data.view().into_shape(input.data.len()).unwrap();
+        // let reshaped_input = Array1::from_shape_vec((input.data.shape()[0]), input.data.clone().into_raw_vec()).unwrap();
         // let reshaped_weights = self.w.data.clone().into_shape((self.w.data.len(), 1)).unwrap();
-        let reshaped_weights = self.w.data.view().into_shape((input.data.len(), self.w.data.shape()[1])).unwrap();
+        let reshaped_weights = self.w.data.view().into_shape((input.data.shape()[0], self.w.data.shape()[1])).unwrap();
+        // let reshaped_weights = Array2::from_shape_vec((self.w.data.view().shape()[0], self.w.data.view().shape()[1]), self.w.data.into_raw_vec()).unwrap();
 
-        Tensor::new(reshaped_input.dot(&reshaped_weights) + &self.b.data, input.requires_grad)
+        return input.matmul(&self.w);
+
+        // Tensor::new(reshaped_input.dot(&reshaped_weights) + &self.b.data, input.requires_grad)
 
         // Tensor::new(input.data.dot(&self.w.data) + &self.b.data, input.requires_grad)
     }

@@ -46,9 +46,9 @@ impl NN for XORNet {
         let flx = sigmoid(self.fl2.calc(&flx));
         let blx = sigmoid(self.bl2.calc(&blx));
 
-        let merged_arr = Tensor::new(concatenate(Axis(0), &[flx.data.view(), blx.data.view()]).unwrap(), false);
+        let merged_tensor = Tensor::new(concatenate![Axis(0), flx.data, blx.data], false);
 
-        let x = tanh(self.hl1.calc(&merged_arr));
+        let x = tanh(self.hl1.calc(&merged_tensor));
 
         return x;
     }
@@ -57,11 +57,19 @@ impl NN for XORNet {
 fn main() {
     let nn = XORNet::new();
 
-    let x = nn.forward(Tensor::new(arr1(&[1., 0.]).into_dyn(), false));
+    for i in 0..1000000 {
+        let x = nn.forward(Tensor::new(arr1(&[1., 0.]).into_dyn(), false));
+        // let y = Tensor::new(arr2(&[[1.], [0.]]).into_dyn(), false);
+
+        // let loss = mean_squared_error(&y.data, &x.data);
+
+        // println!("{}: {}", i, loss);
+    }
+    // let x = nn.forward(Tensor::new(arr1(&[1., 0.]).into_dyn(), false));
 
     // let y = Tensor::new(arr2(&[[1.], [0.]]).into_dyn(), false);
 
     // println!("{}", y);
 
-    println!("{}", &x);
+    // println!("{}", &x);
 }

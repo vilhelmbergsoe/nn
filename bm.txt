@@ -1,0 +1,14 @@
+Normal implementation:
+	[vb@matebook ~/git/nn] time ./target/release/nn
+
+	real    0m0.481s
+	user    0m0.479s
+	sys     0m0.000s
+
+Tensor implementation:
+	[vb@matebook ~/git/nn] time ./target/release/nn
+
+	real    0m2.061s
+	user    0m2.057s
+	sys     0m0.000s
+
