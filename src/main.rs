@@ -43,10 +43,14 @@ impl NN for XORNet {
     fn forward(&self, x: Tensor) -> Tensor {
         let flx = relu(self.fl1.calc(&x));
         let blx = relu(self.bl1.calc(&x));
+        println!("{}", flx);
         let flx = sigmoid(self.fl2.calc(&flx));
         let blx = sigmoid(self.bl2.calc(&blx));
 
         let merged_tensor = Tensor::new(concatenate![Axis(0), flx.data, blx.data], false);
+        // let merged_data = ndarray::stack(Axis(0), &[flx.data.view(), blx.data.view()]).unwrap();
+
+        // let merged_tensor = Tensor::new(merged_data.into_dyn(), false);
 
         let x = tanh(self.hl1.calc(&merged_tensor));
 
@@ -57,19 +61,28 @@ impl NN for XORNet {
 fn main() {
     let nn = XORNet::new();
 
-    for i in 0..1000000 {
-        let x = nn.forward(Tensor::new(arr1(&[1., 0.]).into_dyn(), false));
-        // let y = Tensor::new(arr2(&[[1.], [0.]]).into_dyn(), false);
+    // for i in 0..10000 {
+    //     let x = nn.forward(Tensor::new(arr1(&[1., 0.]).into_dyn(), false));
+    //     // let y = Tensor::new(arr2(&[[1.], [0.]]).into_dyn(), false);
 
-        // let loss = mean_squared_error(&y.data, &x.data);
+    //     // let loss = mean_squared_error(&y.data, &x.data);
 
-        // println!("{}: {}", i, loss);
-    }
-    // let x = nn.forward(Tensor::new(arr1(&[1., 0.]).into_dyn(), false));
+    //     // println!("{}: {}", i, loss);
+    // }
+
+    let x = Tensor::new(arr1(&[3., 2.]).into_dyn(), true);
+    let y = Tensor::new(arr1(&[2., 0.1]).into_dyn(), true);
+    let z = &x * &y;
+
+    println!("z: {}", z);
+
+    // z.backward();
+
+    let x = nn.forward(nn::randn(&[2], false));
 
     // let y = Tensor::new(arr2(&[[1.], [0.]]).into_dyn(), false);
 
     // println!("{}", y);
 
-    // println!("{}", &x);
+    println!("x: {}", x);
 }
