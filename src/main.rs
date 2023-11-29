@@ -1,88 +1,243 @@
-use ndarray::{arr1, arr2, concatenate, Array1, Axis};
+use ndarray::{arr0, arr1, arr2, ArrayD};
+use num_traits::Float;
+use std::fmt;
+use std::ops::{Add, Mul};
 
-mod nn;
-use nn::{relu, sigmoid, tanh, Linear, Tensor, NN};
-
-struct XORNet {
-    fl1: Linear,
-    fl2: Linear,
-
-    bl1: Linear,
-    bl2: Linear,
-
-    hl1: Linear,
+#[derive(Debug, Clone)]
+struct Tensor<T: Float> {
+    data: ArrayD<T>,
+    grad_fn: Option<Box<Node<T>>>,
+    requires_grad: bool,
+    grad: Option<T>,
+    is_leaf: bool,
 }
 
-impl XORNet {}
-
-impl NN for XORNet {
-    fn new() -> Self {
+impl<T: Float> Tensor<T> {
+    fn new(data: ArrayD<T>) -> Self {
         Self {
-            fl1: Linear::new(2, 1),
-            fl2: Linear::new(1, 2),
-
-            bl1: Linear::new(2, 1),
-            bl2: Linear::new(1, 2),
-
-            hl1: Linear::new(4, 2),
+            data,
+            grad_fn: None,
+            requires_grad: false,
+            grad: None,
+            is_leaf: true,
         }
     }
 
-    // TODO: Implement pipeline:
-    // nn.Sequential(
-    //     nn.Sequential(
-    //         nn.Linear(2, 1, activation_func="relu"),
-    //         nn.Linear(1, 2, activation_func="relu")
-    //     ),
-    //     nn.Sequential(
-    //         nn.Linear(2, 1, activation_func="sigmoid"),
-    //         nn.Linear(1,2, activation_func="sigmoid")
-    //     ),
-    //     nn.Linear(4, 1, activation_func="tanh")
-    // )
-    fn forward(&self, x: Tensor) -> Tensor {
-        let flx = relu(self.fl1.calc(&x));
-        let blx = relu(self.bl1.calc(&x));
-        println!("{}", flx);
-        let flx = sigmoid(self.fl2.calc(&flx));
-        let blx = sigmoid(self.bl2.calc(&blx));
+    // Create a scalar tensor
+    pub fn from_scalar(value: T) -> Self {
+        Self {
+            data: arr0(value).into_dyn(),
+            grad_fn: None,
+            requires_grad: false,
+            grad: None,
+            is_leaf: true,
+        }
+    }
 
-        let merged_tensor = Tensor::new(concatenate![Axis(0), flx.data, blx.data], false);
-        // let merged_data = ndarray::stack(Axis(0), &[flx.data.view(), blx.data.view()]).unwrap();
+    // Create a 1D tensor from a slice
+    pub fn from_slice(values: &[T]) -> Self {
+        Self {
+            data: arr1(values).into_dyn(),
+            grad_fn: None,
+            requires_grad: false,
+            grad: None,
+            is_leaf: true,
+        }
+    }
 
-        // let merged_tensor = Tensor::new(merged_data.into_dyn(), false);
+    fn with_grad(mut self) -> Self {
+        self.requires_grad = true;
+        self
+    }
 
-        let x = tanh(self.hl1.calc(&merged_tensor));
+    // // Backward pass for the current tensor
+    // fn backward(&self) {
+    //     if self.requires_grad {
+    //         if let Some(ref grad_fn) = self.grad_fn {
+    //             match grad_fn.operator {
+    //                 Some(Operator::Mul) => self.mul_backward(1.0),
+    //                 // Handle other operators if needed
+    //                 _ => unimplemented!("Backward pass not implemented for this operator"),
+    //             }
+    //         }
+    //     }
+    // }
 
-        return x;
+    // // Backward pass for multiplication
+    // fn mul_backward(&self, grad: T) {
+    //     if self.requires_grad {
+    //         // Only calculate gradient for tensors marked as leaf nodes
+    //         if let Some(ref grad_fn) = self.grad_fn {
+    //             match grad_fn.operator {
+    //                 Some(Operator::Mul) => {
+    //                     // Assuming only two input tensors for simplicity
+    //                     let input1 = &grad_fn.input_tensors[0];
+    //                     let input2 = &grad_fn.input_tensors[1];
+
+    //                     // Compute the gradients
+    //                     let grad_input1 = grad * &input2.data;
+    //                     let grad_input2 = grad * &input1.data;
+
+    //                     // Set the gradients for the input tensors
+    //                     if let Some(ref mut grad) = input1.grad {
+    //                         *grad += grad_input1;
+    //                     } else {
+    //                         input1.grad = Some(grad_input1);
+    //                     }
+
+    //                     if let Some(ref mut grad) = input2.grad {
+    //                         *grad += grad_input2;
+    //                     } else {
+    //                         input2.grad = Some(grad_input2);
+    //                     }
+
+    //                     // Continue the backward pass for input tensors
+    //                     input1.backward(&grad_input1);
+    //                     input2.backward(&grad_input2);
+    //                 }
+    //                 _ => {
+    //                     // Handle other operators if needed
+    //                     unimplemented!("Backward pass not implemented for this operator");
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // mul_backward()
+
+    // pub fn from_2d_array(&self, values: &[Vec<T>]) -> Self {
+    //     Self {
+    //         data: arr2(values).into_dyn(),
+    //         grad_fn: None,
+    //     }
+    // }
+}
+
+impl<T: Float + std::fmt::Debug> fmt::Display for Tensor<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.data)
     }
 }
 
+impl<T: Float> Mul for Tensor<T> {
+    type Output = Tensor<T>;
+
+    fn mul(self, other: Tensor<T>) -> Tensor<T> {
+        let result_data = &self.data * &other.data;
+        let mut result = Tensor::new(result_data);
+
+        // Propagate requires_grad if any of the input tensors requires_grad
+        result.requires_grad = self.requires_grad || other.requires_grad;
+
+        // Initialize grad with None
+        result.grad = None;
+
+        if result.requires_grad {
+            // Set grad_fn for result tensor
+            result.grad_fn = Some(Box::new(Node {
+                input_tensors: vec![self.clone(), other.clone()],
+                operator: Some(Operator::Mul),
+            }));
+            result.is_leaf = false;
+        }
+
+        result
+    }
+}
+
+impl<T: Float> Add for Tensor<T> {
+    type Output = Tensor<T>;
+
+    fn add(self, other: Tensor<T>) -> Tensor<T> {
+        let result_data = &self.data + &other.data;
+        let mut result = Tensor::new(result_data);
+
+        // Propagate requires_grad if any of the input tensors requires_grad
+        result.requires_grad = self.requires_grad || other.requires_grad;
+
+        // Initialize grad with None
+        result.grad = None;
+
+        if result.requires_grad {
+            // Set grad_fn for result tensor
+            result.grad_fn = Some(Box::new(Node {
+                input_tensors: vec![self.clone(), other.clone()],
+                operator: Some(Operator::Add),
+            }));
+        }
+
+        result
+    }
+}
+
+// // Implement Mul and Add for Tensor and &Tensor
+// macro_rules! impl_mul_add {
+//     ($type:ty) => {
+//         impl Mul<$type> for $type {
+//             type Output = Tensor;
+
+//             fn mul(self, other: $type) -> Tensor {
+//                 let mut result = Tensor::new(self.data * other.data);
+
+//                 // Set grad_fn for result tensor
+//                 result.grad_fn = Some(Box::new(Node {
+//                     input_tensors: vec![Box::new(self.clone()), Box::new(other.clone())],
+//                     operator: Some(Operator::Mul),
+//                 }));
+
+//                 result
+//             }
+//         }
+
+//         impl Add<$type> for $type {
+//             type Output = Tensor;
+
+//             fn add(self, other: $type) -> Tensor {
+//                 let result_data = self.data.clone() + other.data.clone();
+//                 let mut result = Tensor::new(result_data);
+
+//                 // Set grad_fn for result tensor
+//                 result.grad_fn = Some(Box::new(Node {
+//                     input_tensors: vec![self, other],
+//                     operator: Some(Operator::Add),
+//                 }));
+
+//                 result
+//             }
+//         }
+//     };
+// }
+
+// impl_mul_add!(&Tensor);
+// impl_mul_add!(Tensor);
+
+#[derive(Debug, Clone, Copy)]
+enum Operator {
+    Add,
+    Mul,
+    Sub,
+}
+
+#[derive(Debug, Clone)]
+struct Node<T: Float> {
+    input_tensors: Vec<Tensor<T>>,
+    operator: Option<Operator>,
+}
+
 fn main() {
-    let nn = XORNet::new();
+    let x = Tensor::from_scalar(2.0).with_grad();
+    let y = Tensor::new(arr1(&[2.0, 0.5]).into_dyn());
+    // let z = x*y;
 
-    // for i in 0..10000 {
-    //     let x = nn.forward(Tensor::new(arr1(&[1., 0.]).into_dyn(), false));
-    //     // let y = Tensor::new(arr2(&[[1.], [0.]]).into_dyn(), false);
+    println!("{:#?}", x*y);
 
-    //     // let loss = mean_squared_error(&y.data, &x.data);
+    // let z = x * y.clone();
 
-    //     // println!("{}: {}", i, loss);
-    // }
+    // println!("{z}");
 
-    let x = Tensor::new(arr1(&[3., 2.]).into_dyn(), true);
-    let y = Tensor::new(arr1(&[2., 0.1]).into_dyn(), true);
-    let z = &x * &y;
+    // let g = z + y;
 
-    println!("z: {}", z);
-
-    // z.backward();
-
-    let x = nn.forward(nn::randn(&[2], false));
-
-    // let y = Tensor::new(arr2(&[[1.], [0.]]).into_dyn(), false);
-
-    // println!("{}", y);
-
-    println!("x: {}", x);
+    // println!("{g}");
+    // println!("{:#?}", g);
 }
