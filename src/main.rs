@@ -12,13 +12,15 @@ fn main() {
     // let g = Tensor::from(&[[1.0], [2.0]]);
     // let y = Tensor::from_scalar(10.0);
     // let y = Tensor::new(arr1(&[2.0, 0.5]).into_dyn());
-    let mut z = x+y;
+    let z = x+y;
+
+    let mut g = z * Tensor::from(2.0).with_grad();
 
     // let mut g =  z * Tensor::from_scalar(5.0).with_grad();
 
-    z.backward();
+    g.backward();
 
-    println!("{:#?}", z);
+    println!("{:#?}", g);
     // }
 
     // println!("{:?}", z)

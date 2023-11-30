@@ -51,6 +51,7 @@ impl<T: Float + fmt::Debug> Add for Tensor<T> {
                 saved_tensors: vec![Box::new(self), Box::new(other)],
                 backward_fn: BackwardFn::Add(AddBackward),
             }));
+            result.is_leaf = false;
         }
 
         result
