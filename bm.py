@@ -31,8 +31,9 @@ def main():
     #     x = torch.tensor([[1., 0.]], dtype=torch.float32)
     #     output = nn(x)
     for i in range(100000):
-        x = torch.tensor(2.0, requires_grad=True)
-        torch.relu(x)
+        x = torch.tensor(10.0, requires_grad=True)
+        z = torch.relu(x)
+        z.backward()
 
 if __name__ == "__main__":
     main()
