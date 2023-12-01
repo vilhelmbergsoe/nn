@@ -5,7 +5,7 @@ use std::fmt;
 
 pub struct Node<T: Float> {
     pub saved_tensors: Vec<Box<Tensor<T>>>,
-    pub backward_fn: BackwardFn,
+    pub backward_fn: BackwardFn<T>,
 }
 
 impl<T: Float> Clone for Node<T> {

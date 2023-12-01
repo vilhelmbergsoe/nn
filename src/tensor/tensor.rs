@@ -1,6 +1,6 @@
 use crate::tensor::backward::{Backward, BackwardFn};
 use crate::tensor::node::Node;
-use ndarray::{arr0, arr1, arr2, ArrayD, Array2};
+use ndarray::{arr0, arr1, arr2, Array2, ArrayD};
 use num_traits::Float;
 use std::borrow::BorrowMut;
 use std::fmt;
@@ -32,30 +32,35 @@ impl<T: Float + fmt::Debug> Tensor<T> {
     }
 
     /// Do backward pass and compute gradients for tree
-    pub fn backward(&mut self) {
+    pub fn backward(mut self) -> Self {
         let grad = ArrayD::from_elem(self.data.shape(), T::from(1.0).unwrap());
-        self.backward_grad(&grad);
+        if grad.shape().is_empty() {
+            self.backward_grad(&grad);
+        } else {
+            panic!("Error: Gradient computation only supports scalar outputs. Make sure you are calling backward on a scalar tensor.");
+        }
+        self
     }
 
     pub fn backward_grad(&mut self, grad: &ArrayD<T>) {
         if let Some(ref mut grad_fn) = self.grad_fn {
             match &grad_fn.backward_fn {
                 BackwardFn::Mul(mul_backward) => {
-                    let mut tensors = grad_fn.saved_tensors.borrow_mut();
-                    mul_backward.backward(&mut tensors, &grad);
+                    mul_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad);
                 }
                 BackwardFn::Add(add_backward) => {
-                    let mut tensors = grad_fn.saved_tensors.borrow_mut();
-                    add_backward.backward(&mut tensors, &grad);
+                    add_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad);
                 }
                 BackwardFn::Relu(relu_backward) => {
                     relu_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad)
+                }
+                BackwardFn::Pow(pow_backward) => {
+                    pow_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad)
                 }
                 _ => todo!(),
             };
         }
     }
-
 }
 
 // Implement from T for Tensor
