@@ -1,9 +1,41 @@
-use crate::tensor::backward::{Backward, BackwardFn};
+use crate::tensor::backward::{BinaryBackward, UnaryBackward};
 use crate::tensor::node::Node;
 use ndarray::{arr0, arr1, arr2, Array2, ArrayD};
 use num_traits::Float;
-use std::borrow::BorrowMut;
+use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
+use std::rc::Rc;
+
+use super::backward::{BinaryBackwardFn, UnaryBackwardFn};
+
+#[derive(Debug, Clone)]
+pub struct TensorRef<T: Float> {
+    pub _ref: Rc<RefCell<Tensor<T>>>,
+}
+
+impl<T: Float + fmt::Debug> TensorRef<T> {
+    pub fn new(tensor: Tensor<T>) -> TensorRef<T> {
+        Self {
+            _ref: Rc::new(RefCell::new(tensor)),
+        }
+    }
+
+    pub fn borrow(&self) -> Ref<Tensor<T>> {
+        self._ref.borrow()
+    }
+
+    pub fn borrow_mut(&mut self) -> RefMut<Tensor<T>> {
+        self._ref.borrow_mut()
+    }
+
+    pub fn backward(&mut self) {
+        self.borrow_mut().backward();
+    }
+
+    pub fn grad(&self) -> Option<ArrayD<T>> {
+        self.borrow().grad.clone()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Tensor<T: Float> {
@@ -32,34 +64,46 @@ impl<T: Float + fmt::Debug> Tensor<T> {
     }
 
     /// Do backward pass and compute gradients for tree
-    pub fn backward(mut self) -> Self {
+    pub fn backward(&mut self) {
         let grad = ArrayD::from_elem(self.data.shape(), T::from(1.0).unwrap());
         if grad.shape().is_empty() {
             self.backward_grad(&grad);
         } else {
             panic!("Error: Gradient computation only supports scalar outputs. Make sure you are calling backward on a scalar tensor.");
         }
-        self
     }
 
     pub fn backward_grad(&mut self, grad: &ArrayD<T>) {
         if let Some(ref mut grad_fn) = self.grad_fn {
-            match &grad_fn.backward_fn {
-                BackwardFn::Mul(mul_backward) => {
-                    mul_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad);
-                }
-                BackwardFn::Add(add_backward) => {
-                    add_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad);
-                }
-                BackwardFn::Relu(relu_backward) => {
-                    relu_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad)
-                }
-                BackwardFn::Pow(pow_backward) => {
-                    pow_backward.backward(&mut grad_fn.saved_tensors.borrow_mut(), &grad)
-                }
-                _ => todo!(),
+            match **grad_fn {
+                Node::Binary {
+                    ref mut tensors,
+                    ref mut backward_fn,
+                } => match backward_fn {
+                    BinaryBackwardFn::Add(add) => {
+                        add.backward(tensors.clone(), &grad);
+                    }
+                    BinaryBackwardFn::Mul(mul) => {
+                        mul.backward(tensors.clone(), &grad);
+                    }
+                },
+                Node::Unary {
+                    ref mut tensor,
+                    ref mut backward_fn,
+                } => match backward_fn {
+                    UnaryBackwardFn::Pow(pow) => {
+                        pow.backward(tensor.clone(), &grad);
+                    }
+                    UnaryBackwardFn::Relu(relu) => {
+                        relu.backward(tensor.clone(), &grad);
+                    }
+                },
             };
         }
+    }
+
+    pub fn as_ref(&self) -> TensorRef<T> {
+        TensorRef::new(self.clone())
     }
 }
 
@@ -90,4 +134,14 @@ impl<T: Float + fmt::Debug> fmt::Display for Tensor<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.data)
     }
+}
+
+#[macro_export]
+macro_rules! tensor {
+    ($data:expr) => {
+        Tensor::from($data).as_ref()
+    };
+    ($data:expr, requires_grad) => {
+        Tensor::from($data).with_grad().as_ref()
+    };
 }

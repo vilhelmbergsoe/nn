@@ -1,94 +1,89 @@
-use crate::tensor::Tensor;
 use ndarray::ArrayD;
 use num_traits::Float;
 use std::fmt;
 
-pub trait Backward<T: Float>: fmt::Debug + Clone {
-    fn backward(&self, saved_tensors: &mut Vec<Box<Tensor<T>>>, grad: &ArrayD<T>);
+use super::tensor::TensorRef;
+
+pub trait BinaryBackward<T: Float>: fmt::Debug + Clone {
+    fn backward(&self, tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>);
 }
 
-// TODO: implement destinctions between binary and unary ops
+pub trait UnaryBackward<T: Float>: fmt::Debug + Clone {
+    fn backward(&self, tensor: TensorRef<T>, grad: &ArrayD<T>);
+}
+
 #[derive(Debug, Clone)]
-pub enum BackwardFn<T: Float> {
+pub enum BinaryBackwardFn {
     Mul(MulBackward),
     Add(AddBackward),
-    Pow(PowBackward<T>),
-    Relu(ReluBackward),
-    // Add other operations as needed
 }
 
 #[derive(Debug, Clone)]
-pub struct MulBackward;
+pub enum UnaryBackwardFn<T: Float> {
+    Pow(PowBackward<T>),
+    Relu(ReluBackward),
+}
 
-impl<T: Float + std::fmt::Debug> Backward<T> for MulBackward {
-    fn backward(&self, tensors: &mut Vec<Box<Tensor<T>>>, grad: &ArrayD<T>) {
-        // Set the gradients for the input tensors
-        if tensors[0].requires_grad {
-            let grad_input0 = grad * &tensors[1].data;
+// TODO: make the backward functions more standard and nicer
 
-            if tensors[0].is_leaf {
-                if let Some(ref mut input0_grad) = tensors[0].grad {
-                    *input0_grad = grad_input0;
+#[derive(Debug, Clone)]
+pub struct AddBackward;
+
+impl<T: Float + std::fmt::Debug> BinaryBackward<T> for AddBackward {
+    fn backward(&self, tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>) {
+        for mut tensor in [tensors.0.clone(), tensors.1.clone()] {
+            let mut tensor = tensor.borrow_mut();
+
+            if tensor.requires_grad {
+                let grad_input = grad.clone();
+
+                if tensor.is_leaf {
+                    if let Some(ref mut input_grad) = tensor.grad {
+                        *input_grad = grad_input;
+                    } else {
+                        tensor.grad = Some(grad_input);
+                    }
                 } else {
-                    tensors[0].grad = Some(grad_input0);
+                    tensor.backward_grad(&grad_input);
                 }
-            // if tensor isn't a leaf node propagate through to the next gradient compute
-            } else {
-                tensors[0].backward_grad(&grad_input0);
-            }
-        }
-
-        if tensors[1].requires_grad {
-            let grad_input1 = grad * &tensors[0].data;
-
-            if tensors[1].is_leaf {
-                if let Some(ref mut input1_grad) = tensors[1].grad {
-                    *input1_grad = grad_input1
-                } else {
-                    tensors[1].grad = Some(grad_input1);
-                }
-            } else {
-                tensors[1].backward_grad(&grad_input1);
             }
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct AddBackward;
+pub struct MulBackward;
 
-impl<T: Float + std::fmt::Debug> Backward<T> for AddBackward {
-    fn backward(&self, tensors: &mut Vec<Box<Tensor<T>>>, grad: &ArrayD<T>) {
-        // Set the gradients for the input tensors
-        if tensors[0].requires_grad {
-            // TODO: FIX THE CALCULATION OF THIS GRADIENT
-            // You have to do reshaping of the current shape to have it in the correct shape
-            let grad_input0 = grad * ArrayD::ones(tensors[0].data.shape());
+impl<T: Float + std::fmt::Debug> BinaryBackward<T> for MulBackward {
+    fn backward(&self, mut tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>) {
+        let mut tensor0 = tensors.0.borrow_mut();
+        let mut tensor1 = tensors.1.borrow_mut();
 
-            if tensors[0].is_leaf {
-                if let Some(ref mut input0_grad) = tensors[0].grad {
+        if tensor0.requires_grad {
+            let grad_input0 = grad * &tensor1.data;
+
+            if tensor0.is_leaf {
+                if let Some(ref mut input0_grad) = tensor0.grad {
                     *input0_grad = grad_input0;
                 } else {
-                    tensors[0].grad = Some(grad_input0);
+                    tensor0.grad = Some(grad_input0);
                 }
-            // Propagate back and call the next backward function
             } else {
-                tensors[0].backward_grad(&grad_input0);
+                tensor0.backward_grad(&grad_input0);
             }
         }
 
-        if tensors[1].requires_grad {
-            // TODO: FIX THE CALCULATION OF THIS GRADIENT
-            let grad_input1 = grad * ArrayD::ones(tensors[1].data.shape());
+        if tensor1.requires_grad {
+            let grad_input1 = grad * &tensor0.data;
 
-            if tensors[1].is_leaf {
-                if let Some(ref mut input1_grad) = tensors[1].grad {
-                    *input1_grad = grad_input1
+            if tensor1.is_leaf {
+                if let Some(ref mut input1_grad) = tensor1.grad {
+                    *input1_grad = grad_input1;
                 } else {
-                    tensors[1].grad = Some(grad_input1);
+                    tensor1.grad = Some(grad_input1);
                 }
             } else {
-                tensors[1].backward_grad(&grad_input1);
+                tensor1.backward_grad(&grad_input1);
             }
         }
     }
@@ -97,26 +92,29 @@ impl<T: Float + std::fmt::Debug> Backward<T> for AddBackward {
 #[derive(Debug, Clone)]
 pub struct PowBackward<T: Float>(pub T);
 
-impl<T: Float + std::fmt::Debug> Backward<T> for PowBackward<T> {
-    fn backward(&self, tensors: &mut Vec<Box<Tensor<T>>>, grad: &ArrayD<T>) {
+impl<T: Float + std::fmt::Debug> UnaryBackward<T> for PowBackward<T> {
+    fn backward(&self, mut tensor: TensorRef<T>, grad: &ArrayD<T>) {
+        let mut tensor = tensor.borrow_mut();
+        let exponent = self.0;
+
         // Set the gradients for the input tensors
-        if tensors[0].requires_grad {
+        if tensor.requires_grad {
             let computed_grad = grad
-                * &(tensors[0]
+                * &(tensor
                     .data
-                    .mapv(|val| self.0 * val.powf(self.0 - T::one())));
+                    .mapv(|val| exponent * val.powf(exponent - T::one())));
 
             // If tensor is a leaf node set gradient field
-            if tensors[0].is_leaf {
-                if let Some(ref mut input_grad) = tensors[0].grad {
+            if tensor.is_leaf {
+                if let Some(ref mut input_grad) = tensor.grad {
                     // Compute gradients for element-wise power operation
                     *input_grad = computed_grad;
                 } else {
-                    tensors[0].grad = Some(computed_grad);
+                    tensor.grad = Some(computed_grad);
                 }
             // If tensor isn't a leaf node, propagate gradient to next grad_fn
             } else {
-                tensors[0].backward_grad(&computed_grad);
+                tensor.backward_grad(&computed_grad);
             }
         }
     }
@@ -125,11 +123,12 @@ impl<T: Float + std::fmt::Debug> Backward<T> for PowBackward<T> {
 #[derive(Debug, Clone)]
 pub struct ReluBackward;
 
-impl<T: Float + std::fmt::Debug> Backward<T> for ReluBackward {
-    fn backward(&self, tensors: &mut Vec<Box<Tensor<T>>>, grad: &ArrayD<T>) {
-        if tensors[0].requires_grad {
-            // let mut input_grad = tensors[0].grad.borrow_mut();
-            let grad_mask = tensors[0].data.mapv(|val| {
+impl<T: Float + std::fmt::Debug> UnaryBackward<T> for ReluBackward {
+    fn backward(&self, mut tensor: TensorRef<T>, grad: &ArrayD<T>) {
+        let mut tensor = tensor.borrow_mut();
+
+        if tensor.requires_grad {
+            let grad_mask = tensor.data.mapv(|val| {
                 if val <= T::from(0.0).unwrap() {
                     T::from(0.0).unwrap()
                 } else {
@@ -137,12 +136,14 @@ impl<T: Float + std::fmt::Debug> Backward<T> for ReluBackward {
                 }
             });
 
-            if tensors[0].is_leaf {
-                if let Some(ref mut input0_grad) = tensors[0].grad {
+            if tensor.is_leaf {
+                if let Some(ref mut input0_grad) = tensor.grad {
                     *input0_grad = grad * &grad_mask;
                 } else {
-                    tensors[0].grad = Some(grad * &grad_mask);
+                    tensor.grad = Some(grad * &grad_mask);
                 }
+            } else {
+                tensor.backward_grad(&(grad * &grad_mask));
             }
         }
     }

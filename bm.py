@@ -36,9 +36,21 @@ def main():
     # z = x+y
     # g = z * torch.tensor(2.0, requires_grad=True);
     # g = g.sum()
-    g = torch.tensor(4.0, requires_grad=True).square()
+    # g = torch.tensor(4.0, requires_grad=True).square()
+    # g.backward()
+    # print(g)
+    x = torch.tensor(2.0, requires_grad=True)
+    y = torch.tensor(3.0, requires_grad=True)
+    z = x * y
+    z.requires_grad_(True)  # Explicitly setting requires_grad for z
+    g = torch.relu(z)
+
     g.backward()
+
     print(g)
+    print(x.grad)
+    print(y.grad)
+    print(z.grad)  # Now you can access the gradient of z
 
 if __name__ == "__main__":
     main()
