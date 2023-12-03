@@ -1,7 +1,6 @@
 use crate::tensor::backward::{BinaryBackward, UnaryBackward};
 use crate::tensor::node::Node;
-use ndarray::{arr0, arr1, arr2, Array2, ArrayD};
-use num_traits::Float;
+use ndarray::{arr0, arr1, arr2, Array2, ArrayD, NdFloat};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
 use std::rc::Rc;
@@ -9,11 +8,11 @@ use std::rc::Rc;
 use super::backward::{BinaryBackwardFn, UnaryBackwardFn};
 
 #[derive(Debug, Clone)]
-pub struct TensorRef<T: Float> {
+pub struct TensorRef<T: NdFloat> {
     pub _ref: Rc<RefCell<Tensor<T>>>,
 }
 
-impl<T: Float + fmt::Debug> TensorRef<T> {
+impl<T: NdFloat + fmt::Debug> TensorRef<T> {
     pub fn new(tensor: Tensor<T>) -> TensorRef<T> {
         Self {
             _ref: Rc::new(RefCell::new(tensor)),
@@ -38,7 +37,7 @@ impl<T: Float + fmt::Debug> TensorRef<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Tensor<T: Float> {
+pub struct Tensor<T: NdFloat> {
     pub data: ArrayD<T>,
     pub grad_fn: Option<Box<Node<T>>>,
     pub requires_grad: bool,
@@ -46,7 +45,7 @@ pub struct Tensor<T: Float> {
     pub is_leaf: bool,
 }
 
-impl<T: Float + fmt::Debug> Tensor<T> {
+impl<T: NdFloat + fmt::Debug> Tensor<T> {
     pub fn new(data: ArrayD<T>) -> Self {
         Self {
             data,
@@ -108,21 +107,21 @@ impl<T: Float + fmt::Debug> Tensor<T> {
 }
 
 // Implement from T for Tensor
-impl<T: Float + fmt::Debug> From<T> for Tensor<T> {
+impl<T: NdFloat + fmt::Debug> From<T> for Tensor<T> {
     fn from(value: T) -> Self {
         Tensor::new(arr0(value).into_dyn())
     }
 }
 
 // Implement from &[T; N] for Tensor
-impl<T: Float + fmt::Debug, const N: usize> From<&[T; N]> for Tensor<T> {
+impl<T: NdFloat + fmt::Debug, const N: usize> From<&[T; N]> for Tensor<T> {
     fn from(slice: &[T; N]) -> Self {
         Tensor::new(arr1(slice).into_dyn())
     }
 }
 
 // Implement From<&[[T; N]; N]> for Tensor
-impl<T: Float + fmt::Debug, const N: usize, const M: usize> From<&[[T; N]; M]> for Tensor<T> {
+impl<T: NdFloat + fmt::Debug, const N: usize, const M: usize> From<&[[T; N]; M]> for Tensor<T> {
     fn from(array: &[[T; N]; M]) -> Self {
         let data = Array2::from_shape_fn((M, N), |(i, j)| array[i][j]);
 
@@ -130,9 +129,9 @@ impl<T: Float + fmt::Debug, const N: usize, const M: usize> From<&[[T; N]; M]> f
     }
 }
 
-impl<T: Float + fmt::Debug> fmt::Display for Tensor<T> {
+impl<T: NdFloat + fmt::Debug> fmt::Display for TensorRef<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.data)
+        write!(f, "{:?}", self.borrow().data)
     }
 }
 

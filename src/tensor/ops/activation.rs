@@ -4,10 +4,10 @@ use crate::tensor::backward::{UnaryBackwardFn, ReluBackward};
 use crate::tensor::node::Node;
 use crate::tensor::Tensor;
 use crate::tensor::tensor::TensorRef;
-use num_traits::Float;
+use ndarray::NdFloat;
 
 // Relu'(0.0) = 0.0 Not sure if this is right
-pub fn relu<T: Float + fmt::Debug>(tensor: &TensorRef<T>) -> TensorRef<T> {
+pub fn relu<T: NdFloat + fmt::Debug>(tensor: &TensorRef<T>) -> TensorRef<T> {
     let x = tensor.borrow();
     let data = x.data.mapv(|val| {
         if val < T::from(0.0).unwrap() {

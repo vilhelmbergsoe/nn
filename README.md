@@ -6,6 +6,10 @@ TODO:
 
 - add retain_grad for also populating grad field of non-leaf tensors
 
+## aknowledgements
+
+- [rusty-grad](https://github.com/samsja/rusty-grad) for helping me understand internal mutability
+
 ## license
 
 [MIT](https://choosealicense.com/licenses/mit/)

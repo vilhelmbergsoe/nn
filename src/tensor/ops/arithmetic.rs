@@ -8,13 +8,13 @@ use crate::tensor::backward::{
 use crate::tensor::node::Node;
 use crate::tensor::tensor::TensorRef;
 use crate::tensor::Tensor;
-use num_traits::Float;
 use std::cell::RefCell;
 use std::fmt;
 use std::ops::{Add, Div, Mul, Sub};
 use std::rc::Rc;
+use ndarray::NdFloat;
 
-impl<T: Float + fmt::Debug> Mul for &TensorRef<T> {
+impl<T: NdFloat + fmt::Debug> Mul for &TensorRef<T> {
     type Output = TensorRef<T>;
 
     fn mul(self, other: &TensorRef<T>) -> TensorRef<T> {
@@ -36,7 +36,7 @@ impl<T: Float + fmt::Debug> Mul for &TensorRef<T> {
     }
 }
 
-impl<T: Float + fmt::Debug> Add for &TensorRef<T> {
+impl<T: NdFloat + fmt::Debug> Add for &TensorRef<T> {
     type Output = TensorRef<T>;
 
     fn add(self, other: &TensorRef<T>) -> TensorRef<T> {
@@ -58,7 +58,7 @@ impl<T: Float + fmt::Debug> Add for &TensorRef<T> {
     }
 }
 
-impl<T: Float + fmt::Debug> TensorRef<T> {
+impl<T: NdFloat + fmt::Debug> TensorRef<T> {
     /// Element-wise power operation
     pub fn pow(&self, exponent: T) -> TensorRef<T> {
         let result_data = self.borrow().data.mapv(|val| val.powf(exponent));

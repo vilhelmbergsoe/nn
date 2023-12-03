@@ -1,13 +1,13 @@
 use crate::tensor::backward::{BinaryBackwardFn, UnaryBackwardFn};
 use crate::tensor::Tensor;
-use num_traits::Float;
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
+use ndarray::NdFloat;
 
 use super::tensor::TensorRef;
 
-pub enum Node<T: Float> {
+pub enum Node<T: NdFloat> {
     Unary {
         tensor: TensorRef<T>,
         backward_fn: UnaryBackwardFn<T>,
@@ -18,7 +18,7 @@ pub enum Node<T: Float> {
     },
 }
 
-impl<T: Float> Clone for Node<T> {
+impl<T: NdFloat> Clone for Node<T> {
     fn clone(&self) -> Self {
         match &self {
             Node::Unary {
@@ -39,7 +39,7 @@ impl<T: Float> Clone for Node<T> {
     }
 }
 
-impl<T: Float + fmt::Debug> fmt::Debug for Node<T> {
+impl<T: NdFloat + fmt::Debug> fmt::Debug for Node<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Node::Unary {

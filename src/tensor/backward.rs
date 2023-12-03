@@ -1,14 +1,13 @@
-use ndarray::ArrayD;
-use num_traits::Float;
+use ndarray::{ArrayD, NdFloat};
 use std::fmt;
 
 use super::tensor::TensorRef;
 
-pub trait BinaryBackward<T: Float>: fmt::Debug + Clone {
+pub trait BinaryBackward<T: NdFloat>: fmt::Debug + Clone {
     fn backward(&self, tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>);
 }
 
-pub trait UnaryBackward<T: Float>: fmt::Debug + Clone {
+pub trait UnaryBackward<T: NdFloat>: fmt::Debug + Clone {
     fn backward(&self, tensor: TensorRef<T>, grad: &ArrayD<T>);
 }
 
@@ -19,7 +18,7 @@ pub enum BinaryBackwardFn {
 }
 
 #[derive(Debug, Clone)]
-pub enum UnaryBackwardFn<T: Float> {
+pub enum UnaryBackwardFn<T: NdFloat> {
     Pow(PowBackward<T>),
     Relu(ReluBackward),
 }
@@ -29,7 +28,7 @@ pub enum UnaryBackwardFn<T: Float> {
 #[derive(Debug, Clone)]
 pub struct AddBackward;
 
-impl<T: Float + std::fmt::Debug> BinaryBackward<T> for AddBackward {
+impl<T: NdFloat + std::fmt::Debug> BinaryBackward<T> for AddBackward {
     fn backward(&self, tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>) {
         for mut tensor in [tensors.0.clone(), tensors.1.clone()] {
             let mut tensor = tensor.borrow_mut();
@@ -54,7 +53,7 @@ impl<T: Float + std::fmt::Debug> BinaryBackward<T> for AddBackward {
 #[derive(Debug, Clone)]
 pub struct MulBackward;
 
-impl<T: Float + std::fmt::Debug> BinaryBackward<T> for MulBackward {
+impl<T: NdFloat + std::fmt::Debug> BinaryBackward<T> for MulBackward {
     fn backward(&self, mut tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>) {
         let mut tensor0 = tensors.0.borrow_mut();
         let mut tensor1 = tensors.1.borrow_mut();
@@ -90,9 +89,9 @@ impl<T: Float + std::fmt::Debug> BinaryBackward<T> for MulBackward {
 }
 
 #[derive(Debug, Clone)]
-pub struct PowBackward<T: Float>(pub T);
+pub struct PowBackward<T: NdFloat>(pub T);
 
-impl<T: Float + std::fmt::Debug> UnaryBackward<T> for PowBackward<T> {
+impl<T: NdFloat + std::fmt::Debug> UnaryBackward<T> for PowBackward<T> {
     fn backward(&self, mut tensor: TensorRef<T>, grad: &ArrayD<T>) {
         let mut tensor = tensor.borrow_mut();
         let exponent = self.0;
@@ -123,7 +122,7 @@ impl<T: Float + std::fmt::Debug> UnaryBackward<T> for PowBackward<T> {
 #[derive(Debug, Clone)]
 pub struct ReluBackward;
 
-impl<T: Float + std::fmt::Debug> UnaryBackward<T> for ReluBackward {
+impl<T: NdFloat + std::fmt::Debug> UnaryBackward<T> for ReluBackward {
     fn backward(&self, mut tensor: TensorRef<T>, grad: &ArrayD<T>) {
         let mut tensor = tensor.borrow_mut();
 
