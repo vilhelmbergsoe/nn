@@ -11,41 +11,40 @@ use nn::nn::{Linear, NN};
 
 struct XORNet<T: NdFloat> {
     fl1: Linear<T>,
-    // fl2: Linear<T>,
+    fl2: Linear<T>,
 
-    // bl1: Linear<T>,
-    // bl2: Linear<T>,
+    bl1: Linear<T>,
+    bl2: Linear<T>,
 
-    // hl1: Linear<T>,
+    hl1: Linear<T>,
 }
 
 impl<T: NdFloat> NN<T> for XORNet<T> where Standard: Distribution<T> {
     fn new() -> Self {
         Self {
             fl1: Linear::new(2, 1),
-            // fl2: Linear::new(1, 2),
+            fl2: Linear::new(1, 2),
 
-            // bl1: Linear::new(2, 1),
-            // bl2: Linear::new(1, 2),
+            bl1: Linear::new(2, 1),
+            bl2: Linear::new(1, 2),
 
-            // hl1: Linear::new(4, 2),
+            hl1: Linear::new(4, 2),
         }
     }
 
     fn forward(&self, input: TensorRef<T>) -> TensorRef<T> {
         let flx = self.fl1.forward(input.clone());
-        // let blx = self.bl1.forward(input.clone());
+        let blx = self.bl1.forward(input.clone());
 
-        // let flx = self.fl2.forward(flx);
-        // let blx = self.bl2.forward(blx);
+        let flx = self.fl2.forward(flx);
+        let blx = self.bl2.forward(blx);
 
-        // // TODO: add concatenate operation on tensorref
-        // let merged_arr = Tensor::new(concatenate(Axis(0), &[flx.borrow().data.view(), blx.borrow().data.view()]).unwrap()).as_ref();
+        // TODO: add concatenate operation on tensorref
+        let merged_arr = Tensor::new(concatenate(Axis(0), &[flx.borrow().data.view(), blx.borrow().data.view()]).unwrap()).as_ref();
 
-        // let x = self.hl1.forward(merged_arr);
+        let x = self.hl1.forward(merged_arr);
 
-        // x
-        flx
+        x
     }
 }
 
@@ -62,11 +61,20 @@ fn main() {
 
     // println!("{}", x);
 
-    let nn = XORNet::new();
+    let nn = XORNet::<f32>::new();
+    for i in 0..100_000 {
+        let x = tensor!(&[1., 1.]);
+        let mut y = nn.forward(x);
+    }
 
-    let x = nn.forward(tensor!(&[1., 0.]));
+    // let g = tensor!(&[[1.], [2.]]);
 
-    println!("{}", x);
+    // println!("{}", &g*&x);
+
+
+    // y.backward();
+
+    // println!("{}", y);
 
     // g.backward();
 

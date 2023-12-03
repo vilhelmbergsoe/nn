@@ -8,17 +8,22 @@ use crate::tensor::backward::{
 use crate::tensor::node::Node;
 use crate::tensor::tensor::TensorRef;
 use crate::tensor::Tensor;
-use std::cell::RefCell;
 use std::fmt;
 use std::ops::{Add, Div, Mul, Sub};
-use std::rc::Rc;
 use ndarray::NdFloat;
 
+// TODO: fix reshaping of the output.
 impl<T: NdFloat + fmt::Debug> Mul for &TensorRef<T> {
     type Output = TensorRef<T>;
 
     fn mul(self, other: &TensorRef<T>) -> TensorRef<T> {
-        let result_data = &self.borrow().data * &other.borrow().data;
+        // Reshape data in order to avoid broadcasting issues.
+        // TODO: implement dot on TensorRef or fix underlying multiplication issue
+        let binding = self.borrow();
+        let reshaped_self = binding.data.view().into_shape(self.borrow().data.len()).unwrap();
+        let binding = other.borrow();
+        let reshaped_other = binding.data.view().into_shape((self.borrow().data.len(), other.borrow().data.shape()[1])).unwrap();
+        let result_data = reshaped_self.dot(&reshaped_other).into_dyn();
         let mut result = Tensor::new(result_data);
 
         result.requires_grad = self.borrow().requires_grad || other.borrow().requires_grad;
@@ -32,7 +37,7 @@ impl<T: NdFloat + fmt::Debug> Mul for &TensorRef<T> {
             result.is_leaf = false;
         }
 
-        TensorRef::new(result)
+        result.as_ref()
     }
 }
 
@@ -54,7 +59,7 @@ impl<T: NdFloat + fmt::Debug> Add for &TensorRef<T> {
             result.is_leaf = false;
         }
 
-        TensorRef::new(result)
+        result.as_ref()
     }
 }
 
@@ -72,7 +77,7 @@ impl<T: NdFloat + fmt::Debug> TensorRef<T> {
         }));
         result.is_leaf = false;
 
-        TensorRef::new(result)
+        result.as_ref()
     }
 
     // /// Calculate the mean of all Tensor elements

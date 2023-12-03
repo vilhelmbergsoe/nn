@@ -20,12 +20,8 @@ impl<T: NdFloat> Linear<T> where Standard: Distribution<T> {
     }
 
     pub fn forward(&self, input: TensorRef<T>) -> TensorRef<T> {
-        let input = input.borrow_mut();
-        let weights = self.w.borrow_mut();
-
-        // let reshaped_input = input.data.view_mut().into_shape(input.data.len()).unwrap();
-        // let reshaped_weights = weights.data.view_mut().into_shape((input.data.len(), weights.data.shape()[1])).unwrap();
-
+        // TODO: gradient computation only supporting scalar outputs when this
+        // returns a 1d array of only one element
         &(&input * &self.w) + &self.b
     }
 }
