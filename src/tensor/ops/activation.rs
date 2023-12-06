@@ -1,9 +1,9 @@
 use core::fmt;
 
-use crate::tensor::backward::{UnaryBackwardFn, ReluBackward};
+use crate::tensor::backward::{ReluBackward, UnaryBackwardFn};
 use crate::tensor::node::Node;
-use crate::tensor::Tensor;
 use crate::tensor::tensor::TensorRef;
+use crate::tensor::Tensor;
 use ndarray::NdFloat;
 
 // Relu'(0.0) = 0.0 Not sure if this is right
@@ -17,8 +17,7 @@ pub fn relu<T: NdFloat + fmt::Debug>(tensor: &TensorRef<T>) -> TensorRef<T> {
         }
     });
 
-    TensorRef::new(
-        Tensor {
+    TensorRef::new(Tensor {
         data,
         grad_fn: Some(Box::new(Node::Unary {
             tensor: tensor.clone(),

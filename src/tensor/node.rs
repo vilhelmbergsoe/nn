@@ -1,9 +1,9 @@
 use crate::tensor::backward::{BinaryBackwardFn, UnaryBackwardFn};
 use crate::tensor::Tensor;
+use ndarray::NdFloat;
 use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
-use ndarray::NdFloat;
 
 use super::tensor::TensorRef;
 

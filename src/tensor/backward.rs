@@ -15,12 +15,14 @@ pub trait UnaryBackward<T: NdFloat>: fmt::Debug + Clone {
 pub enum BinaryBackwardFn {
     Mul(MulBackward),
     Add(AddBackward),
+    Sub(SubBackward),
 }
 
 #[derive(Debug, Clone)]
 pub enum UnaryBackwardFn<T: NdFloat> {
     Pow(PowBackward<T>),
     Relu(ReluBackward),
+    Mean(MeanBackward),
 }
 
 // TODO: make the backward functions more standard and nicer
@@ -45,6 +47,44 @@ impl<T: NdFloat + std::fmt::Debug> BinaryBackward<T> for AddBackward {
                 } else {
                     tensor.backward_grad(&grad_input);
                 }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SubBackward;
+
+impl<T: NdFloat + std::fmt::Debug> BinaryBackward<T> for SubBackward {
+    fn backward(&self, mut tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>) {
+        let mut tensor0 = tensors.0.borrow_mut();
+        let mut tensor1 = tensors.1.borrow_mut();
+
+        if tensor0.requires_grad {
+            let grad_input = grad.clone();
+
+            if tensor0.is_leaf {
+                if let Some(ref mut input_grad) = tensor0.grad {
+                    *input_grad = grad_input;
+                } else {
+                    tensor0.grad = Some(grad_input);
+                }
+            } else {
+                tensor0.backward_grad(&grad_input);
+            }
+        }
+
+        if tensor1.requires_grad {
+            let grad_input = -grad.clone();
+
+            if tensor1.is_leaf {
+                if let Some(ref mut input_grad) = tensor1.grad {
+                    *input_grad = grad_input;
+                } else {
+                    tensor1.grad = Some(grad_input);
+                }
+            } else {
+                tensor1.backward_grad(&grad_input);
             }
         }
     }
@@ -112,6 +152,29 @@ impl<T: NdFloat + std::fmt::Debug> UnaryBackward<T> for PowBackward<T> {
                     tensor.grad = Some(computed_grad);
                 }
             // If tensor isn't a leaf node, propagate gradient to next grad_fn
+            } else {
+                tensor.backward_grad(&computed_grad);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MeanBackward;
+
+impl<T: NdFloat + std::fmt::Debug> UnaryBackward<T> for MeanBackward {
+    fn backward(&self, mut tensor: TensorRef<T>, grad: &ArrayD<T>) {
+        let mut tensor = tensor.borrow_mut();
+
+        if tensor.requires_grad {
+            let computed_grad = grad * T::from(1.0).unwrap() / T::from(tensor.data.len()).unwrap();
+
+            if tensor.is_leaf {
+                if let Some(ref mut input0_grad) = tensor.grad {
+                    *input0_grad = computed_grad;
+                } else {
+                    tensor.grad = Some(computed_grad);
+                }
             } else {
                 tensor.backward_grad(&computed_grad);
             }

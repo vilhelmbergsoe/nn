@@ -62,11 +62,11 @@ impl<T: NdFloat + fmt::Debug> Tensor<T> {
         self
     }
 
-    /// Do backward pass and compute gradients for tree
+    /// Do backward pass and compute gradients for tree, initializing the
+    /// gradient to 1
     pub fn backward(&mut self) {
-        let grad = ArrayD::from_elem(self.data.shape(), T::from(1.0).unwrap());
-        if grad.shape().is_empty() {
-            self.backward_grad(&grad);
+        if self.data.shape().is_empty() {
+            self.backward_grad(&arr0(T::one()).into_dyn());
         } else {
             panic!("Error: Gradient computation only supports scalar outputs. Make sure you are calling backward on a scalar tensor.");
         }
@@ -85,6 +85,9 @@ impl<T: NdFloat + fmt::Debug> Tensor<T> {
                     BinaryBackwardFn::Mul(mul) => {
                         mul.backward(tensors.clone(), &grad);
                     }
+                    BinaryBackwardFn::Sub(sub) => {
+                        sub.backward(tensors.clone(), &grad);
+                    }
                 },
                 Node::Unary {
                     ref mut tensor,
@@ -95,6 +98,9 @@ impl<T: NdFloat + fmt::Debug> Tensor<T> {
                     }
                     UnaryBackwardFn::Relu(relu) => {
                         relu.backward(tensor.clone(), &grad);
+                    }
+                    UnaryBackwardFn::Mean(mean) => {
+                        mean.backward(tensor.clone(), &grad);
                     }
                 },
             };
