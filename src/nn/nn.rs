@@ -47,7 +47,7 @@ pub trait NN<T: NdFloat> {
 
 pub fn mse_loss<T: NdFloat>(output: &TensorRef<T>, target: &TensorRef<T>) -> TensorRef<T>
 where
-    T: FromPrimitive
+    T: FromPrimitive,
 {
     let diff = output - target;
     let squared_diff = &diff * &diff;

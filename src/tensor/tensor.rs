@@ -85,6 +85,9 @@ impl<T: NdFloat + fmt::Debug> Tensor<T> {
                     BinaryBackwardFn::Mul(mul) => {
                         mul.backward(tensors.clone(), &grad);
                     }
+                    BinaryBackwardFn::Div(div) => {
+                        div.backward(tensors.clone(), &grad);
+                    }
                     BinaryBackwardFn::Sub(sub) => {
                         sub.backward(tensors.clone(), &grad);
                     }

@@ -1,6 +1,7 @@
 use crate::tensor::backward::{
     AddBackward,
     BinaryBackwardFn,
+    DivBackward,
     MeanBackward,
     MulBackward,
     PowBackward, // , MulBackward, PowBackward
@@ -87,6 +88,28 @@ impl<T: NdFloat + fmt::Debug> Sub for &TensorRef<T> {
             result.grad_fn = Some(Box::new(Node::Binary {
                 tensors: (self.clone(), other.clone()),
                 backward_fn: BinaryBackwardFn::Sub(SubBackward),
+            }));
+            result.is_leaf = false;
+        }
+
+        result.as_ref()
+    }
+}
+
+impl<T: NdFloat + fmt::Debug> Div for &TensorRef<T> {
+    type Output = TensorRef<T>;
+
+    fn div(self, other: &TensorRef<T>) -> TensorRef<T> {
+        let result_data = &self.borrow().data / &other.borrow().data;
+        let mut result = Tensor::new(result_data);
+
+        result.requires_grad = self.borrow().requires_grad || other.borrow().requires_grad;
+        result.grad = None;
+
+        if result.requires_grad {
+            result.grad_fn = Some(Box::new(Node::Binary {
+                tensors: (self.clone(), other.clone()),
+                backward_fn: BinaryBackwardFn::Div(DivBackward),
             }));
             result.is_leaf = false;
         }

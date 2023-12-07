@@ -1,4 +1,4 @@
-use ndarray::{ArrayD, NdFloat};
+use ndarray::{arr0, ArrayD, NdFloat};
 use std::fmt;
 
 use super::tensor::TensorRef;
@@ -15,6 +15,7 @@ pub trait UnaryBackward<T: NdFloat>: fmt::Debug + Clone {
 pub enum BinaryBackwardFn {
     Mul(MulBackward),
     Add(AddBackward),
+    Div(DivBackward),
     Sub(SubBackward),
 }
 
@@ -85,6 +86,46 @@ impl<T: NdFloat + std::fmt::Debug> BinaryBackward<T> for SubBackward {
                 }
             } else {
                 tensor1.backward_grad(&grad_input);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DivBackward;
+
+impl<T: NdFloat + std::fmt::Debug> BinaryBackward<T> for DivBackward {
+    fn backward(&self, mut tensors: (TensorRef<T>, TensorRef<T>), grad: &ArrayD<T>) {
+        let mut tensor0 = tensors.0.borrow_mut();
+        let mut tensor1 = tensors.1.borrow_mut();
+
+        if tensor0.requires_grad {
+            let grad_input0 = grad / &tensor1.data;
+
+            if tensor0.is_leaf {
+                if let Some(ref mut input0_grad) = tensor0.grad {
+                    *input0_grad = grad_input0;
+                } else {
+                    tensor0.grad = Some(grad_input0);
+                }
+            } else {
+                tensor0.backward_grad(&grad_input0);
+            }
+        }
+
+        if tensor1.requires_grad {
+            let grad_input1 = grad
+                * arr0(T::from(-1.0).unwrap()).into_dyn()
+                * (&tensor1.data / (&tensor0.data * &tensor0.data));
+
+            if tensor1.is_leaf {
+                if let Some(ref mut input1_grad) = tensor1.grad {
+                    *input1_grad = grad_input1;
+                } else {
+                    tensor1.grad = Some(grad_input1);
+                }
+            } else {
+                tensor1.backward_grad(&grad_input1);
             }
         }
     }
