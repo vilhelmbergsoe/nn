@@ -7,18 +7,15 @@ use tensor::relu;
 use tensor::{Tensor, TensorRef};
 
 mod nn;
-use nn::nn::{Linear, NN};
+use nn::nn::{Linear, Module};
+use nn::optim::{SGD, Optimizer};
 
 struct XORNet<T: NdFloat> {
     fl1: Linear<T>,
     fl2: Linear<T>,
-    // bl1: Linear<T>,
-    // bl2: Linear<T>,
-
-    // hl1: Linear<T>,
 }
 
-impl<T: NdFloat> NN<T> for XORNet<T>
+impl<T: NdFloat> XORNet<T>
 where
     Standard: Distribution<T>,
 {
@@ -26,84 +23,40 @@ where
         Self {
             fl1: Linear::new(2, 2),
             fl2: Linear::new(2, 1),
-            // bl1: Linear::new(2, 1),
-            // bl2: Linear::new(1, 2),
-
-            // hl1: Linear::new(4, 2),
         }
     }
 
-    fn forward(&self, inputs: &TensorRef<T>) -> TensorRef<T> {
-        let mut outputs: Vec<TensorRef<T>> = Vec::new();
-        for input in inputs.borrow().data.iter() {
-            let flx = relu(&self.fl1.forward(&tensor!(input.clone())));
-            let flx = relu(&self.fl2.forward(&flx));
-            outputs.push(flx);
-        }
+    fn forward(&self, input: &TensorRef<T>) -> TensorRef<T> {
+        let x = relu(&self.fl1.forward(&input));
+        relu(&self.fl2.forward(&x))
+    }
 
-        // let blx = self.bl1.forward(&input.clone());
-
-        // let flx = self.fl2.forward(&flx);
-        // let blx = self.bl2.forward(&blx);
-
-        // TODO: add concatenate operation on tensorref right now this doesn't
-        // create a backward_fn
-        // let merged_arr = Tensor::new(
-        //     concatenate(
-        //         Axis(0),
-        //         &[flx.borrow().data.view(), blx.borrow().data.view()],
-        //     )
-        //     .unwrap(),
-        // )
-        // .as_ref();
-
-        // let x = self.hl1.forward(&merged_arr);
-
-        // x
-        tensor!(&outputs).as_ref()
+    fn params(&self) -> Vec<TensorRef<T>> {
+        // return all parameters
     }
 }
 
 fn main() {
-    // let x = tensor!(2.0, requires_grad);
-    // let y = tensor!(3.0, requires_grad);
-    // let z = &x * &y;
-    // let mut g = relu(&z);
+    let inputs: TensorRef<f32> = tensor!(&[[0., 0.], [0., 1.], [1., 0.], [1., 1.]]);
+    let targets: TensorRef<f32> = tensor!(&[0., 1., 1., 0.]);
 
-    // let f1 = Linear::<f32>::new(1, 2);
-    // let f2 = Linear::<f32>::new(2, 1);
-
-    // let x = f1.forward(tensor!(&[1.0, 2.0]));
-
-    // println!("{}", x);
-    let inputs = &[[0., 0.], [0., 1.], [1., 0.], [1., 1.]];
-    let targets = &[0., 1., 1., 0.];
+    let batch_size: usize = inputs.borrow().data.len();
 
     let nn = XORNet::<f32>::new();
-    for i in 0..100_000 {
-        let outputs: Vec<TensorRef<f32>> = Vec::new();
-        for input in inputs {
-            let output = nn.forward(&tensor!(input));
+    let mut sgd = SGD::new(nn.params(), 0.1);
+    for e in 0..100_000 {
+        let mut outputs: Vec<TensorRef<f32>> = Vec::new();
+        for i in 0..batch_size {
+            let output = nn.forward(&inputs);
             outputs.push(output);
         }
-        let mut loss = nn::nn::mse_loss(output, target);
+
+        let outputs = Tensor::from(outputs).with_grad().as_ref();
+
+        sgd.zero_grad();
+        let mut loss = nn::nn::mse_loss(&outputs, &targets);
+        loss.backward();
+
+        sgd.step(&loss);
     }
-
-    // z.backward();
-
-    // println!("{:?}", nn.fl2.w._ref.borrow().grad);
-
-    // let g = tensor!(&[[1.], [2.]]);
-
-    // println!("{}", &g*&x);
-
-    // y.backward();
-
-    // println!("{}", y);
-
-    // g.backward();
-
-    // // println!("{:?}", g);
-    // println!("{:?}", x.grad());
-    // println!("{:?}", y.grad());
 }

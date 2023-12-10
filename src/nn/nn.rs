@@ -30,19 +30,24 @@ where
         }
     }
 
-    pub fn forward(&self, input: &TensorRef<T>) -> TensorRef<T> {
+}
+
+impl<T: ndarray::NdFloat> Module<T> for Linear<T> {
+    fn forward(&self, input: &TensorRef<T>) -> TensorRef<T> {
         // TODO: gradient computation only supporting scalar outputs when this
         // returns a 1d array of only one element
-        &(input * &self.w) + &self.b
+        input.dot(&self.w) + &self.b
+    }
+
+    fn params(&self) -> Vec<TensorRef<T>> {
+        vec![self.w.clone(), self.b.clone()]
     }
 }
 
-pub trait NN<T: NdFloat> {
-    fn new() -> Self;
-
+pub trait Module<T: NdFloat> {
     fn forward(&self, input: &TensorRef<T>) -> TensorRef<T>;
 
-    fn params(&self) -> &[TensorRef<T>];
+    fn params(&self) -> Vec<TensorRef<T>>;
 }
 
 pub fn mse_loss<T: NdFloat>(output: &TensorRef<T>, target: &TensorRef<T>) -> TensorRef<T>

@@ -1,6 +1,6 @@
 use crate::tensor::backward::{BinaryBackward, UnaryBackward};
 use crate::tensor::node::Node;
-use ndarray::{arr0, arr1, arr2, Array2, ArrayD, NdFloat};
+use ndarray::{arr0, arr1, arr2, Array2, ArrayD, NdFloat, concatenate, Axis};
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
 use std::rc::Rc;
@@ -135,6 +135,18 @@ impl<T: NdFloat + fmt::Debug, const N: usize, const M: usize> From<&[[T; N]; M]>
         let data = Array2::from_shape_fn((M, N), |(i, j)| array[i][j]);
 
         Tensor::new(data.into_dyn())
+    }
+}
+
+impl<T: NdFloat> From<Vec<TensorRef<T>>> for Tensor<T> {
+    fn from(tensors: Vec<TensorRef<T>>) -> Self {
+        // let data: Vec<_> = tensors.iter().map(|t| t.borrow().data.clone().view()).collect();
+        // // Construct the new Tensor using the collected data
+        // Tensor::new(concatenate(Axis(0), data.as_slice()).unwrap())
+        let data: Vec<_> = tensors.iter().map(|t| t.borrow().data.clone()).collect();
+        let views: Vec<_> = data.iter().map(|d| d.view()).collect();
+        // Construct the new Tensor using the collected views
+        Tensor::new(concatenate(Axis(0), views.as_slice()).unwrap())
     }
 }
 
