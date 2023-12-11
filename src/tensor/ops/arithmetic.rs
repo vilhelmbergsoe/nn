@@ -14,6 +14,7 @@ use crate::tensor::Tensor;
 use ndarray::NdFloat;
 use std::fmt;
 use std::ops::{Add, Div, Mul, Sub};
+use ndarray::linalg::Dot;
 
 // TODO: fix reshaping of the output.
 impl<T: NdFloat + fmt::Debug> Mul for &TensorRef<T> {
@@ -35,7 +36,8 @@ impl<T: NdFloat + fmt::Debug> Mul for &TensorRef<T> {
             .into_shape((self.borrow().data.len(), other.borrow().data.shape()[1]))
             .unwrap();
         let result_data = reshaped_self.dot(&reshaped_other).into_dyn();
-        let mut result = Tensor::new(result_data);
+        // let result_data = self.borrow().data.dot(&other.borrow().data);
+        let mut result = Tensor::new(result_data.into_dyn());
 
         result.requires_grad = self.borrow().requires_grad || other.borrow().requires_grad;
         result.grad = None;

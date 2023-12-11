@@ -22,17 +22,13 @@ where
     fn new() -> Self {
         Self {
             fl1: Linear::new(2, 2),
-            fl2: Linear::new(2, 1),
+            fl2: Linear::new(2, 2),
         }
     }
 
     fn forward(&self, input: &TensorRef<T>) -> TensorRef<T> {
         let x = relu(&self.fl1.forward(&input));
         relu(&self.fl2.forward(&x))
-    }
-
-    fn params(&self) -> Vec<TensorRef<T>> {
-        // return all parameters
     }
 }
 
@@ -43,7 +39,7 @@ fn main() {
     let batch_size: usize = inputs.borrow().data.len();
 
     let nn = XORNet::<f32>::new();
-    let mut sgd = SGD::new(nn.params(), 0.1);
+    let mut sgd = SGD::new(vec![nn.fl1.w.clone(), nn.fl2.w.clone()], 0.1);
     for e in 0..100_000 {
         let mut outputs: Vec<TensorRef<f32>> = Vec::new();
         for i in 0..batch_size {
@@ -57,6 +53,6 @@ fn main() {
         let mut loss = nn::nn::mse_loss(&outputs, &targets);
         loss.backward();
 
-        sgd.step(&loss);
+        sgd.step();
     }
 }

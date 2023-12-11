@@ -9,6 +9,7 @@ include = ["src/**/*", "LICENSE", "README.md"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+linalg = "0.1.0"
 ndarray = "0.15.6"
 num-traits = "0.2.17"
 rand = "0.8.5"

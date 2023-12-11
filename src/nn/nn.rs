@@ -36,7 +36,7 @@ impl<T: ndarray::NdFloat> Module<T> for Linear<T> {
     fn forward(&self, input: &TensorRef<T>) -> TensorRef<T> {
         // TODO: gradient computation only supporting scalar outputs when this
         // returns a 1d array of only one element
-        input.dot(&self.w) + &self.b
+        &(input * &self.w) + &self.b
     }
 
     fn params(&self) -> Vec<TensorRef<T>> {
