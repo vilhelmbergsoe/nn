@@ -36,7 +36,7 @@ impl<T: ndarray::NdFloat> Module<T> for Linear<T> {
     fn forward(&self, input: &TensorRef<T>) -> TensorRef<T> {
         // TODO: gradient computation only supporting scalar outputs when this
         // returns a 1d array of only one element
-        &(input * &self.w) + &self.b
+        &input.dot(&self.w) + &self.b
     }
 
     fn params(&self) -> Vec<TensorRef<T>> {
@@ -54,7 +54,9 @@ pub fn mse_loss<T: NdFloat>(output: &TensorRef<T>, target: &TensorRef<T>) -> Ten
 where
     T: FromPrimitive,
 {
+    // THIS IS THE PROBLEM NOW
     let diff = output - target;
+
     let squared_diff = &diff * &diff;
     squared_diff.mean().unwrap()
 }

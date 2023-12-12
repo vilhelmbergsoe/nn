@@ -1,4 +1,4 @@
-use ndarray::{arr0, arr1, arr2, ArrayD};
+use ndarray::{arr0, arr1, arr2, ArrayD, Array, IxDyn};
 use ndarray::{concatenate, Axis, NdFloat};
 
 mod tensor;
@@ -33,8 +33,14 @@ where
 }
 
 fn main() {
+    // let a = Array::from(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    // let b = Array::from_shape_vec(IxDyn(&[3, 2]), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+
+    // let result = &a.dot(&b);
+
+    // println!("{}", result);
     let inputs: TensorRef<f32> = tensor!(&[[0., 0.], [0., 1.], [1., 0.], [1., 1.]]);
-    let targets: TensorRef<f32> = tensor!(&[0., 1., 1., 0.]);
+    let targets: TensorRef<f32> = tensor!(&[[0., 1., 1., 0.]]);
 
     let batch_size: usize = inputs.borrow().data.len();
 
