@@ -29,7 +29,6 @@ where
                 .as_ref(),
         }
     }
-
 }
 
 impl<T: ndarray::NdFloat> Module<T> for Linear<T> {

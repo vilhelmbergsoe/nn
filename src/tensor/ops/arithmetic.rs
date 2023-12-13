@@ -11,11 +11,11 @@ use crate::tensor::backward::{
 use crate::tensor::node::Node;
 use crate::tensor::tensor::TensorRef;
 use crate::tensor::Tensor;
-use ndarray::{NdFloat, Ix2};
+use ndarray::linalg::Dot;
+use ndarray::{Ix2, NdFloat};
+use num_traits::cast::FromPrimitive;
 use std::fmt;
 use std::ops::{Add, Div, Mul, Sub};
-use ndarray::linalg::Dot;
-use num_traits::cast::FromPrimitive;
 
 // TODO: fix reshaping of the output.
 impl<T: NdFloat + fmt::Debug> Mul for &TensorRef<T> {
@@ -163,7 +163,6 @@ impl<T: NdFloat + fmt::Debug> TensorRef<T> {
         result.as_ref()
     }
 
-
     pub fn dot(&self, other: &TensorRef<T>) -> TensorRef<T> {
         // assert!(self_.ndim() != 0 && w.ndim() != 0, "Both tensors must be at least 1D");
         // assert!(
@@ -177,8 +176,18 @@ impl<T: NdFloat + fmt::Debug> TensorRef<T> {
 
         // let mut w_reshaped = w.clone().reshape(w.shape()[..w.ndim() - cmp::min(w.ndim(), 2)].iter().chain(std::iter::repeat(&1)).chain(w.shape()[w.ndim() - cmp::min(w.ndim(), 2)..].iter()));
         // w_reshaped.invert_axes();
-        let self_ = self.borrow().data.clone().into_dimensionality::<Ix2>().unwrap();
-        let other_ = other.borrow().data.clone().into_dimensionality::<Ix2>().unwrap();
+        let self_ = self
+            .borrow()
+            .data
+            .clone()
+            .into_dimensionality::<Ix2>()
+            .unwrap();
+        let other_ = other
+            .borrow()
+            .data
+            .clone()
+            .into_dimensionality::<Ix2>()
+            .unwrap();
 
         let result_data = self_.dot(&other_).into_dyn();
 

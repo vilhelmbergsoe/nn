@@ -1,6 +1,6 @@
 use ndarray::{ArrayD, NdFloat};
 
-use crate::tensor::{TensorRef, Tensor};
+use crate::tensor::{Tensor, TensorRef};
 
 pub trait Optimizer<T: NdFloat> {
     fn new(params: Vec<TensorRef<T>>, learning_rate: f32) -> Self;
@@ -10,7 +10,7 @@ pub trait Optimizer<T: NdFloat> {
 
 pub struct SGD<T: NdFloat> {
     learning_rate: f32,
-    params: Vec<TensorRef<T>>
+    params: Vec<TensorRef<T>>,
 }
 
 impl<T: NdFloat> Optimizer<T> for SGD<T> {
@@ -24,7 +24,8 @@ impl<T: NdFloat> Optimizer<T> for SGD<T> {
     fn step(&mut self) {
         for param in self.params.iter_mut() {
             let mut param = param.borrow_mut();
-            param.data = param.data.clone() - param.grad.clone().unwrap() * T::from(self.learning_rate).unwrap();
+            param.data = param.data.clone()
+                - param.grad.clone().unwrap() * T::from(self.learning_rate).unwrap();
         }
     }
 

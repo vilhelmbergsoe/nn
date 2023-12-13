@@ -1,167 +1,147 @@
-use crate::tensor::backward::{BinaryBackward, UnaryBackward};
-use crate::tensor::node::Node;
-use ndarray::{arr0, arr1, arr2, Array2, ArrayD, NdFloat, concatenate, Axis};
-use std::cell::{Ref, RefCell, RefMut};
-use std::fmt;
+use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::backward::{BinaryBackwardFn, UnaryBackwardFn};
-
-#[derive(Debug, Clone)]
-pub struct TensorRef<T: NdFloat> {
-    pub _ref: Rc<RefCell<Tensor<T>>>,
+#[derive(Clone)]
+pub struct Tensor_ {
+    storage: Storage,
+    grad_fn: Option<BackpropOp>,
+    is_leaf: bool,
+    requires_grad: bool,
+    grad: Option<Tensor>,
+    dtype: DType,
 }
 
-impl<T: NdFloat + fmt::Debug> TensorRef<T> {
-    pub fn new(tensor: Tensor<T>) -> TensorRef<T> {
-        Self {
-            _ref: Rc::new(RefCell::new(tensor)),
-        }
-    }
+#[derive(Clone)]
+pub struct Tensor(Rc<RefCell<Tensor_>>);
 
-    pub fn borrow(&self) -> Ref<Tensor<T>> {
-        self._ref.borrow()
-    }
-
-    pub fn borrow_mut(&mut self) -> RefMut<Tensor<T>> {
-        self._ref.borrow_mut()
-    }
-
-    pub fn backward(&mut self) {
-        self.borrow_mut().backward();
-    }
-
-    pub fn grad(&self) -> Option<ArrayD<T>> {
-        self.borrow().grad.clone()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Tensor<T: NdFloat> {
-    pub data: ArrayD<T>,
-    pub grad_fn: Option<Box<Node<T>>>,
-    pub requires_grad: bool,
-    pub grad: Option<ArrayD<T>>,
-    pub is_leaf: bool,
-}
-
-impl<T: NdFloat + fmt::Debug> Tensor<T> {
-    pub fn new(data: ArrayD<T>) -> Self {
-        Self {
-            data,
-            grad_fn: None,
-            requires_grad: false,
-            grad: None,
-            is_leaf: true,
-        }
-    }
-
-    /// Initialize with the requires_grad flag set
-    pub fn with_grad(mut self) -> Self {
-        self.requires_grad = true;
+impl AsRef<Tensor> for Tensor {
+    fn as_ref(&self) -> &Tensor {
         self
     }
+}
 
-    /// Do backward pass and compute gradients for tree, initializing the
-    /// gradient to 1
-    pub fn backward(&mut self) {
-        if self.data.shape().is_empty() {
-            self.backward_grad(&arr0(T::one()).into_dyn());
-        } else {
-            panic!("Error: Gradient computation only supports scalar outputs. Make sure you are calling backward on a scalar tensor.");
+#[derive(Clone)]
+pub struct Shape(Vec<usize>);
+
+trait NdArray {
+    // TODO: Option / Result?
+    fn shape(&self) -> Option<Shape>;
+}
+
+impl<T: WithDType> NdArray for T {
+    fn shape(&self) -> Option<Shape> {
+        Some(Shape::from(()))
+    }
+}
+
+impl<T: WithDType, const N: usize> NdArray for &[T; N] {
+    fn shape(&self) -> Option<Shape> {
+        Some(Shape::from(self.len()))
+    }
+}
+
+impl<T: WithDType> NdArray for &[T] {
+    fn shape(&self) -> Option<Shape> {
+        Some(Shape::from(self.len()))
+    }
+}
+
+impl<T: WithDType, const N: usize, const M: usize> NdArray for &[[T; N]; M] {
+    fn shape(&self) -> Option<Shape> {
+        Some(Shape::from((M, N)))
+    }
+}
+
+impl<T: WithDType, const N1: usize, const N2: usize, const N3: usize> NdArray
+    for &[[[T; N3]; N2]; N1]
+{
+    fn shape(&self) -> Option<Shape> {
+        Some(Shape::from((N1, N2, N3)))
+    }
+}
+
+enum DType {
+    F32,
+    F64,
+}
+
+trait WithDType {
+    const DTYPE: DType;
+
+    fn from_f64(v: f64) -> Self;
+    fn to_f64(self) -> f64;
+}
+
+macro_rules! with_dtype {
+    ($ty:ty, $dtype:ident, $from_f64:expr, $to_f64:expr) => {
+        impl WithDType for $ty {
+            const DTYPE: DType = DType::$dtype;
+
+            fn from_f64(v: f64) -> Self {
+                $from_f64(v)
+            }
+
+            fn to_f64(self) -> f64 {
+                $to_f64(self)
+            }
         }
+    };
+}
+
+with_dtype!(f32, F32, |v: f64| v as f32, |v: f32| v as f64);
+with_dtype!(f64, F64, |v: f64| v, |v: f64| v);
+
+fn from_storage(
+    storage: Storage,
+    shape: Shape,
+    op: BackpropOp,
+    requires_grad: bool,
+    is_leaf: bool,
+) -> Tensor {
+    let dtype = storage.dtype();
+    let tensor_ = Tensor_ {
+        storage,
+        grad_fn: op,
+        grad: None,
+        dtype,
+        is_leaf,
+        requires_grad,
+    };
+    Tensor(Rc::new(RefCell::new(tensor_)))
+}
+
+impl Tensor {
+    pub fn new<A: NdArray>(
+        arr: A,
+        device: &Device,
+        requires_grad: bool,
+        is_leaf: bool,
+    ) -> Option<Self> {
+        let shape = arr.shape()?;
+        Self::new_impl(arr, shape, device, requires_grad, is_leaf);
     }
 
-    pub fn backward_grad(&mut self, grad: &ArrayD<T>) {
-        if let Some(ref mut grad_fn) = self.grad_fn {
-            match **grad_fn {
-                Node::Binary {
-                    ref mut tensors,
-                    ref mut backward_fn,
-                } => match backward_fn {
-                    BinaryBackwardFn::Add(add) => {
-                        add.backward(tensors.clone(), &grad);
-                    }
-                    BinaryBackwardFn::Mul(mul) => {
-                        mul.backward(tensors.clone(), &grad);
-                    }
-                    BinaryBackwardFn::Div(div) => {
-                        div.backward(tensors.clone(), &grad);
-                    }
-                    BinaryBackwardFn::Sub(sub) => {
-                        sub.backward(tensors.clone(), &grad);
-                    }
-                },
-                Node::Unary {
-                    ref mut tensor,
-                    ref mut backward_fn,
-                } => match backward_fn {
-                    UnaryBackwardFn::Pow(pow) => {
-                        pow.backward(tensor.clone(), &grad);
-                    }
-                    UnaryBackwardFn::Relu(relu) => {
-                        relu.backward(tensor.clone(), &grad);
-                    }
-                    UnaryBackwardFn::Mean(mean) => {
-                        mean.backward(tensor.clone(), &grad);
-                    }
-                },
-            };
+    pub fn new_impl<A: NdArray>(
+        arr: A,
+        shape: Shape,
+        device: &Device,
+        requires_grad: bool,
+        is_leaf: bool,
+    ) -> Option<Tensor> {
+        let n: usize = shape.elem_count();
+        let buf_size: usize = arr.shape()?.elem_count();
+        if buf_size != n {
+            // TODO: implement err
+            return None;
         }
+        let storage = device.storage(arr)?;
+        let op: Option<BackpropOp> = None;
+        Ok(from_storage(
+            storage,
+            shape.clone(),
+            op,
+            requires_grad,
+            is_leaf,
+        ))
     }
-
-    pub fn as_ref(&self) -> TensorRef<T> {
-        TensorRef::new(self.clone())
-    }
-}
-
-// Implement from T for Tensor
-impl<T: NdFloat + fmt::Debug> From<T> for Tensor<T> {
-    fn from(value: T) -> Self {
-        Tensor::new(arr0(value).into_dyn())
-    }
-}
-
-// Implement from &[T; N] for Tensor
-impl<T: NdFloat + fmt::Debug, const N: usize> From<&[T; N]> for Tensor<T> {
-    fn from(slice: &[T; N]) -> Self {
-        Tensor::new(arr1(slice).into_dyn())
-    }
-}
-
-// Implement From<&[[T; N]; N]> for Tensor
-impl<T: NdFloat + fmt::Debug, const N: usize, const M: usize> From<&[[T; N]; M]> for Tensor<T> {
-    fn from(array: &[[T; N]; M]) -> Self {
-        let data = Array2::from_shape_fn((M, N), |(i, j)| array[i][j]);
-
-        Tensor::new(data.into_dyn())
-    }
-}
-
-impl<T: NdFloat> From<Vec<TensorRef<T>>> for Tensor<T> {
-    fn from(tensors: Vec<TensorRef<T>>) -> Self {
-        // let data: Vec<_> = tensors.iter().map(|t| t.borrow().data.clone().view()).collect();
-        // // Construct the new Tensor using the collected data
-        // Tensor::new(concatenate(Axis(0), data.as_slice()).unwrap())
-        let data: Vec<_> = tensors.iter().map(|t| t.borrow().data.clone()).collect();
-        let views: Vec<_> = data.iter().map(|d| d.view()).collect();
-        // Construct the new Tensor using the collected views
-        Tensor::new(concatenate(Axis(0), views.as_slice()).unwrap())
-    }
-}
-
-impl<T: NdFloat + fmt::Debug> fmt::Display for TensorRef<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.borrow().data)
-    }
-}
-
-#[macro_export]
-macro_rules! tensor {
-    ($data:expr) => {
-        Tensor::from($data).as_ref()
-    };
-    ($data:expr, requires_grad) => {
-        Tensor::from($data).with_grad().as_ref()
-    };
 }

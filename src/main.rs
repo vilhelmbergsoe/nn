@@ -1,4 +1,4 @@
-use ndarray::{arr0, arr1, arr2, ArrayD, Array, IxDyn};
+use ndarray::{arr0, arr1, arr2, Array, ArrayD, IxDyn};
 use ndarray::{concatenate, Axis, NdFloat};
 
 mod tensor;
@@ -8,7 +8,7 @@ use tensor::{Tensor, TensorRef};
 
 mod nn;
 use nn::nn::{Linear, Module};
-use nn::optim::{SGD, Optimizer};
+use nn::optim::{Optimizer, SGD};
 
 struct XORNet<T: NdFloat> {
     fl1: Linear<T>,
@@ -40,7 +40,7 @@ fn main() {
 
     // println!("{}", result);
     let inputs: TensorRef<f32> = tensor!(&[[0., 0.], [0., 1.], [1., 0.], [1., 1.]]);
-    let targets: TensorRef<f32> = tensor!(&[[0., 1., 1., 0.]]);
+    let targets: TensorRef<f32> = tensor!(&[[0.], [1.], [1.], [0.]]);
 
     let batch_size: usize = inputs.borrow().data.len();
 
