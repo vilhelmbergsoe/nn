@@ -1,4 +1,5 @@
 use crate::tensor::Tensor;
+use crate::device::Device;
 
 fn main() {
     let dev = Device::Cpu;

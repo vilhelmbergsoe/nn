@@ -23,11 +23,19 @@ pub struct Tensor_ {
 }
 
 #[derive(Clone)]
-pub struct Tensor(Rc<Tensor_>);
+pub struct Tensor(Arc<Tensor_>);
 
 impl AsRef<Tensor> for Tensor {
     fn as_ref(&self) -> &Tensor {
         self
+    }
+}
+
+impl std::ops::Deref for Tensor {
+    type Target = Tensor_;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
     }
 }
 
@@ -47,7 +55,7 @@ fn from_storage(
         is_leaf,
         requires_grad,
     };
-    Tensor(Rc::new(tensor_))
+    Tensor(Arc::new(tensor_))
 }
 
 impl Tensor {
